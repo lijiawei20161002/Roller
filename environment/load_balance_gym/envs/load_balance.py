@@ -1,4 +1,4 @@
-from load_balance_gym.envs.param import config
+from load_balance_gym.envs.config import config
 from load_balance_gym.envs.job import Job
 from load_balance_gym.envs.job_generator import generate_job
 from load_balance_gym.envs.server import Server
@@ -22,7 +22,6 @@ class LoadBalanceEnv(gym.Env):
         self.max_job_size = 100
         self.queue_size = config.load_balance_queue_size
         self.queue = [self.queue_size] * (config.num_servers +1)
-        #self.queue = [(self.max_job_size//10)**self.queue_size] * (config.num_servers +1)
         self.observation_space = spaces.MultiDiscrete(self.queue)
         self.action_space = spaces.Discrete(config.num_servers)
 

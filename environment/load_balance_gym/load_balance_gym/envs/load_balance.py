@@ -11,7 +11,7 @@ from gym import error, spaces, utils
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 
-import pandas
+import pandas as pd
 import numpy as np
 
 class LoadBalanceEnv(gym.Env):
@@ -19,13 +19,20 @@ class LoadBalanceEnv(gym.Env):
 
     def setup_space(self):
         self.mystep = 0
-        self.max_job_size = 100
-        self.queue_size = config.load_balance_queue_size
-        self.queue = [self.queue_size] * (config.num_servers +1)
-        self.observation_space = spaces.MultiDiscrete(self.queue)
-        self.action_space = spaces.Discrete(config.num_servers)
+        self.max_job_size = config.getfloat('parameters', 'max_job_size')
+        self.queue_size = config.getfloat('parameters', 'queue_size')
+        self.num_servers = config.getint('parameters', 'num_servers')
+        self.queue = [self.queue_size] * (self.num_servers +1)
+        self.obs_low = np.array([0] * (self.num_servers + 1))
+        self.obs_high = np.array([self.queue_size] * (self.num_servers + 1))
+        self.observation_space = spaces.Box(
+            low=self.obs_low, high=self.obs_high, dtype=np.float64)
+        self.action_space = spaces.Discrete(self.num_servers)
 
-    def np_random(self, seed=42):
+    def contains(self, observation_space, x):
+        return x.shape == observation_space.shape and (x>=observation_space.low).all() and (x<=observation_space.high).all()
+
+    def np_random(seed=42):
         if not (isinstance(seed, int) and seed >= 0):
             raise ValueError('Seed must be a non-negative integer.')
         rng = np.random.RandomState()
@@ -33,27 +40,25 @@ class LoadBalanceEnv(gym.Env):
         return rng
 
     def seed(self, seed):
-        self.np_random = self.np_random(seed)
-
-    def contains(self, observation_space, x):
-        return x.shape == observation_space.shape and (x>=observation_space.low).all() and (x<=observation_space.high).all()
+        self.np_random = self.np_random(42)
 
     def __init__(self):
         self.setup_space()
-        self.seed(config.seed)
         self.wall_time = WallTime()
         self.timeline = Timeline()
-        self.num_stream_jobs = config.num_stream_jobs
-        self.servers = self.initialize_servers(config.service_rates)
+        df = pd.read_csv(config.get('database', 'database'))
+        self.num_stream_jobs = len(df)
+        service_rates = config.get('parameters', 'service_rates').split('[')[1].split(']')[0].split(',')
+        service_rates = [float(rate) for rate in service_rates]
+        self.servers = self.initialize_servers(service_rates)
         self.incoming_job = None
         self.finished_jobs = []
         self.reset()
 
     def generate_job(self):
         if self.num_stream_jobs_left > 0:
-            dt, size = generate_job(self.np_random, self.mystep)
-            t = self.wall_time.curr_time
-            self.timeline.push(t+dt, size)
+            t, size = generate_job(self.mystep)
+            self.timeline.push(t, size)
             self.num_stream_jobs_left -= 1
 
     def initialize(self):
@@ -61,13 +66,13 @@ class LoadBalanceEnv(gym.Env):
         self.generate_job()
         new_time, obj = self.timeline.pop()
         self.wall_time.update(new_time)
-        assert isinstance(obj, int)
+        assert isinstance(obj, float)
         size = obj
         self.incoming_job = Job(size, self.wall_time.curr_time)
 
     def initialize_servers(self, service_rates):
         servers = []
-        for server_id in range(config.num_servers):
+        for server_id in range(self.num_servers):
             server = Server(server_id, service_rates[server_id], self.wall_time)
             servers.append(server)
         return servers
@@ -84,43 +89,7 @@ class LoadBalanceEnv(gym.Env):
         self.initialize()
         return self.observe()
     
-    def num_to_tuple(self, base, num):
-        arr = np.zeros(self.queue_size)
-        for i in range(len(arr)-1, -1, -1):
-            arr[i] = num % base
-            num = num // base
-        return arr
-    
-    def tuple_to_num(self, base, arr):
-        sm = 0
-        for i in range(len(arr)-1, -1, -1):
-            sm += sm * base + arr[i]
-        return int(sm)
-    
-    def observe_2(self):
-        obs_arr = []
-        if self.incoming_job is None:
-            obs_arr.append(0)
-        else:
-            if self.incoming_job.size > self.max_job_size:
-                print('Incoming job at time '+str(self.wall_time.curr_time)+' has size '+str(self.incoming_job.size)+' larger than obs_high '+str(self.obs_high[-1]))
-                obs_arr.append(self.max_job_size // 10)
-            else:
-                obs_arr.append(self.incoming_job.size // 10)
-        for server in self.servers:
-            arr = np.zeros(self.queue_size)
-            if server.curr_job is not None:
-                arr[0] = min(self.max_job_size, server.curr_job.finish_time - self.wall_time.curr_time)
-            for i in range(1, self.queue_size):
-                if i < len(server.queue):
-                    arr[i] = server.queue[i-1].size//10
-                else:
-                    arr[i] = 0
-            obs_arr.append(self.tuple_to_num(self.max_job_size//10, arr))
-        obs_arr = np.array(obs_arr)
-        #assert self.contains(self.observation_space, obs_arr)
-        return obs_arr
-
+    # [queue size] 
     def observe(self):
         self.mystep += 1
         obs_arr = []
@@ -132,18 +101,41 @@ class LoadBalanceEnv(gym.Env):
                 obs_arr.append(self.queue_size)
             else:
                 obs_arr.append(self.incoming_job.size)
-        #active_job_num = 0
         for server in self.servers:
             load = 0
             if server.curr_job is not None:
                 load += (server.curr_job.finish_time - self.wall_time.curr_time)
             load += sum(j.size for j in server.queue)
             obs_arr.append(int(load))
-        #obs_arr.append(active_job_num)
         obs_arr = np.array(obs_arr)
-        #assert self.contains(self.observation_space, obs_arr)
-        return obs_arr
+        assert self.observation_space.contains(obs_arr)
+        return (obs_arr, {'state representation': '[queue size]'})
     
+     # full observation: [tuple_to_num([curr job size, size for each job in queue] for each queue)]
+    def observe_2(self):
+        obs_arr = []
+        if self.incoming_job is None:
+            obs_arr.append(0)
+        else:
+            if self.incoming_job.size > self.max_job_size:
+                print('Incoming job at time '+str(self.wall_time.curr_time)+' has size '+str(self.incoming_job.size)+' larger than obs_high '+str(self.obs_high[-1]))
+                obs_arr.append(self.max_job_size)
+            else:
+                obs_arr.append(self.incoming_job.size)
+        for server in self.servers:
+            arr = np.zeros(self.queue_size)
+            if server.curr_job is not None:
+                arr[0] = min(self.max_job_size, server.curr_job.finish_time - self.wall_time.curr_time)
+            for i in range(1, self.queue_size):
+                if i < len(server.queue):
+                    arr[i] = server.queue[i-1].size
+                else:
+                    arr[i] = 0
+            obs_arr.append(self.tuple_to_num(self.max_job_size, arr))
+        obs_arr = np.array(obs_arr)
+        return (obs_arr, {'state representation': 'full observation: [tuple_to_num([curr job size, size for each job in queue] for each queue)]'})
+    
+    # [queue size] + [active job number in each queue]
     def observe_3(self):
         obs_arr = []
         if self.incoming_job is None:
@@ -165,11 +157,10 @@ class LoadBalanceEnv(gym.Env):
             cnt += len(server.queue)
             obs_arr.append(int(load))
             active_job_num.append(cnt)
-        #obs_arr.append(active_job_num)
         obs_arr = np.array(obs_arr+active_job_num)
-        #assert self.contains(self.observation_space, obs_arr)
-        return obs_arr
+        return (obs_arr, {'state representation': '[queue size] + [active job number in each queue]'})
     
+    # [queue size] + [idx of max job in each queue]
     def observe_4(self):
         obs_arr = []
         if self.incoming_job is None:
@@ -198,15 +189,10 @@ class LoadBalanceEnv(gym.Env):
                 cnt += 1
             obs_arr.append(int(load))
             max_job_idx.append(idx)
-        #obs_arr.append(active_job_num)
         obs_arr = np.array(obs_arr+max_job_idx)
-        #assert self.contains(self.observation_space, obs_arr)
-        return obs_arr
+        return (obs_arr, {'state representation': '[queue size] + [idx of max job in each queue]'})
 
     def step(self, action):
-        #print('=======action!!', action)
-        #assert self.action_space.contains(action)
-        #print(self.servers, action)
         self.servers[action].schedule(self.incoming_job)
         running_job = self.servers[action].process() # [ToDo] handle per step
         if running_job is not None:
@@ -231,10 +217,10 @@ class LoadBalanceEnv(gym.Env):
                         reward -= new_time - self.wall_time.curr_time
                     else:
                         reward -= (min(new_time, server.curr_job.finish_time)-self.wall_time.curr_time)
-            old_time = self.wall_time.curr_time
+            #old_time = self.wall_time.curr_time
             self.wall_time.update(new_time)
-
-            if isinstance(obj, int):
+            
+            if isinstance(obj, float):
                 size = obj
                 self.incoming_job = Job(size, self.wall_time.curr_time)
                 break

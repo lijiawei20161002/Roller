@@ -1,0 +1,209 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/6en8XCp+HHAAK5GSLf2xlYtvJ8U2Q4U+9cuEnJoa3" crossorigin="anonymous">  
+    <title>Queueing System</title>  
+    <style>  
+        body {  
+            background-color: #1a1a1a;  
+            font-family: Arial, sans-serif;  
+        }  
+        .container {  
+            max-width: 800px;  
+            margin: 50px auto;  
+            padding: 30px;  
+            background-color: #303030;  
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);  
+            border-radius: 5px;  
+            color: #f5f5f5;  
+        }  
+        h1 {  
+            color: #ffffff;  
+            text-align: center;  
+            margin-bottom: 30px;  
+        }  
+        h2 {  
+            margin-bottom: 15px;  
+        }  
+        .form-group {  
+            margin-bottom: 1rem;  
+        }  
+        .algorithm-stats {  
+            margin-top: 20px;  
+        }  
+    </style>  
+</head>  
+<body>  
+    <div class="container">  
+        <h1>Queueing System</h1>  
+        <form>  
+            <table class="table table-dark table-bordered">  
+                <thead>  
+                    <tr>  
+                        <th scope="col">Server Number</th>  
+                        <th scope="col">Service Rates</th>  
+                        <th scope="col">Queue Sizes</th>  
+                    </tr>  
+                </thead>  
+                <tbody>  
+                    <tr>  
+                        <td>  
+                            <input type="number" class="form-control" id="serverNumber" placeholder="Enter server number">  
+                        </td>  
+                        <td>  
+                            <input type="text" class="form-control" id="serviceRates" placeholder="Enter service rates, separated by commas">  
+                        </td>  
+                        <td>  
+                            <input type="text" class="form-control" id="queueSizes" placeholder="Enter queue sizes, separated by commas">  
+                        </td>  
+                   </tr>
+               </tbody>
+               <thead>
+                    <tr>   
+                        <th scope="col">Current Queue Lengths</th>  
+                        <th scope="col">Max Job Size</th>  
+                        <th scope="col">Total Jobs</th>  
+                    </tr>   
+               </thead>
+               <tbody>
+                   <tr>
+                        <td>  
+                            <input type="text" class="form-control" id="queueLengths" placeholder="Enter current queue lengths, separated by commas">  
+                        </td>  
+                        <td>  
+                            <input type="number" class="form-control" id="maxJobSize" placeholder="Enter max job size">  
+                        </td>  
+                        <td>  
+                            <input type="number" class="form-control" id="totalJobs" placeholder="Enter total number of jobs">  
+                        </td>  
+                    </tr>  
+                </tbody>  
+            </table>  
+  
+            <div class="form-group">  
+                <label for="schedulingAlgorithms">Scheduling Algorithms</label>  
+                <div id="schedulingAlgorithms">  
+                    <div class="form-check">  
+                        <input class="form-check-input" type="checkbox" value="Random" id="random">  
+                        <label class="form-check-label" for="random">  
+                            Random  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="ShortestQueue" id="shortest queue">  
+                        <label class="form-check-label" for="shortestqueue">  
+                            Shortest Queue  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="DedicatedServer" id="dedicatedserver">  
+                        <label class="form-check-label" for="dedicatedserver">  
+                            Random  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="A2C" id="a2c">  
+                        <label class="form-check-label" for="a2c">  
+                            A2C  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="DQN" id="dqn">  
+                        <label class="form-check-label" for="dan">  
+                            DQN 
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="PPO1" id="ppo1">  
+                        <label class="form-check-label" for="ppo1">  
+                            PPO1  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="PPO2" id="ppo2">  
+                        <label class="form-check-label" for="ppo2">  
+                            PPO2  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="ACER" id="acer">  
+                        <label class="form-check-label" for="acer">  
+                            ACER  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="ACKTR" id="acktr">  
+                        <label class="form-check-label" for="acktr">  
+                            ACKTR  
+                        </label>  
+                        <input class="form-check-input" type="checkbox" value="TRPO" id="trpo">  
+                        <label class="form-check-label" for="trpo">  
+                            TRPO  
+                        </label>  
+                    </div>  
+                    <!-- Add more checkboxes for other scheduling algorithms -->  
+                </div>  
+            </div>  
+  
+                        <button type="submit" class="btn btn-primary">Start Simulation</button>  
+        </form>  
+        <div class="algorithm-stats">  
+            <h2>Algorithm Performance</h2>  
+            <p>Cumulative rewards over time: <span id="cumulativeRewards">0</span></p>  
+            <p>Best algorithm: <span id="bestAlgorithm">N/A</span></p>
+            <div>  
+            <p>Real-time throughput: <span id="realTimeThroughput">0</span></p>  
+            <p>Average waiting time: <span id="averageWaitingTime">0</span></p>  
+            </div>
+        </div>  
+          
+        <!-- Add a new div element for displaying the reward history plot -->  
+        <div>  
+            <canvas id="rewardHistory"></canvas>  
+        </div>  
+    </div>  
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js" integrity="sha384-eMNCOe7tC1doHpGoJtKh7z7lGz7fuP4F8nfdFvAOA6Gg/z6Y5J6XqqyGXYM2ntXVC" crossorigin="anonymous"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.min.js" integrity="sha384-cn7l7gDp0eyniUwwAZgrzD06kc/tftFf19TOAs2zVinnD/C7E91j9yyk5//jjpt/" crossorigin="anonymous"></script>  
+      
+    <!-- Add Chart.js library for creating the reward history plot -->  
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>  
+    <script>  
+        // Example data for the reward history plot with negative values  
+        const exampleData = {  
+            labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],  
+            datasets: [{  
+                label: 'Cumulative Rewards',  
+                data: [-10, -15, -20, -25, -35, -40, -45, -50, -60, -70],  
+                borderColor: 'rgb(75, 192, 192)',  
+                tension: 0.1  
+            }]  
+        };  
+  
+        // Create a line chart for the reward history plot  
+        const ctx = document.getElementById('rewardHistory').getContext('2d');  
+        const rewardHistoryChart = new Chart(ctx, {  
+            type: 'line',  
+            data: exampleData,  
+            options: {  
+                scales: {  
+                    x: {  
+                        display: true,  
+                        title: {  
+                            display: true,  
+                            text: 'Time'  
+                        }  
+                    },  
+                    y: {  
+                        display: true,  
+                        title: {  
+                            display: true,  
+                            text: 'Cumulative Rewards'  
+                        }  
+                    }  
+                },  
+                plugins: {  
+                    legend: {  
+                        display: false  
+                    },  
+                    tooltip: {  
+                        callbacks: {  
+                            title: function(context) {  
+                                return 'Time: ' + context[0].label;  
+                            },  
+                            label: function(context) {  
+                                return 'Cumulative Rewards: ' + context.parsed.y;  
+                            }  
+                        }  
+                    }  
+                }  
+            }  
+        });  
+    </script>  
+</body>  
+</html>  

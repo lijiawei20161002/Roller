@@ -11,3 +11,7 @@ Roller is a lightweight Reinforcement Learning (RL) exploration tool designed to
 ## Use Cases
 - Testing algorithm robustness: Roller helps users evaluate and understand the performance of different RL algorithms in various scenarios and under different training configurations.
 - Algorithm selection: Roller assists in selecting the most suitable algorithms for specific queueing systems based on their performance in the built-in simulator.
+
+## Usage
+- test.py gives an example to test the simulator.
+- run visualization/app.py to enable user interaction via web front end for Roller. 
